@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+**/node_modules/
+**/.angular/
+.vs/
+*.suo
+*.user
+**/dist/
+**/wwwroot/
+data/
+*.wav

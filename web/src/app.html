@@ -1,0 +1,331 @@
+@if (!ready) {
+  <main class="loading-screen" aria-live="polite">A Számlázó betöltése…</main>
+} @else if (!email) {
+  <main class="auth">
+    <section class="auth-intro">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">≋</span><span>Számlázó</span></div>
+      <div class="auth-copy">
+        <h1>Tudd, mire megy el<br>a pénzed.</h1>
+        <p>Olvasd be a blokkjaidat, kövesd a kiadásaidat, és tervezz havi költségkeretet.</p>
+        <div class="auth-chart" aria-hidden="true">
+          <div class="chart-grid"></div>
+          <div class="auth-bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        </div>
+      </div>
+      <span class="auth-note"><span aria-hidden="true">◉</span> Helyi dokumentumfeldolgozás</span>
+    </section>
+    <section class="auth-panel">
+      <div class="auth-form">
+        <h2>{{ authMode === 'login' ? 'Bejelentkezés' : 'Fiók létrehozása' }}</h2>
+        <form (ngSubmit)="authenticate()">
+          <label>E-mail-cím <input name="email" type="email" [(ngModel)]="credentials.email" required maxlength="254" autocomplete="username" placeholder="nev@pelda.hu"></label>
+          <label>Jelszó <input name="password" type="password" [(ngModel)]="credentials.password" required minlength="10" maxlength="128" [attr.autocomplete]="authMode === 'login' ? 'current-password' : 'new-password'" placeholder="Legalább 10 karakter"></label>
+          @if (error) { <p class="alert" role="alert">{{ error }}</p> }
+          <button class="primary" type="submit" [disabled]="busy">{{ busy ? 'Egy pillanat…' : authMode === 'login' ? 'Bejelentkezés' : 'Regisztráció' }}</button>
+        </form>
+        <p class="auth-switch">
+          {{ authMode === 'login' ? 'Még nincs fiókod?' : 'Van már fiókod?' }}
+          <button class="text-button" type="button" (click)="setAuth(authMode === 'login' ? 'register' : 'login')">{{ authMode === 'login' ? 'Regisztráció' : 'Bejelentkezés' }}</button>
+        </p>
+      </div>
+    </section>
+  </main>
+} @else {
+  <div class="workspace">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">≋</span><span>Számlázó</span></div>
+      <nav aria-label="Főmenü">
+        <button [class.active]="view === 'overview'" [attr.aria-current]="view === 'overview' ? 'page' : null" (click)="navigate('overview')"><span aria-hidden="true">▦</span> Áttekintés</button>
+        <button [class.active]="view === 'expenses'" [attr.aria-current]="view === 'expenses' ? 'page' : null" (click)="navigate('expenses')"><span aria-hidden="true">≡</span> Kiadások</button>
+        <button [class.active]="view === 'analysis'" [attr.aria-current]="view === 'analysis' ? 'page' : null" (click)="navigate('analysis')"><span aria-hidden="true">▥</span> Elemzés</button>
+        <button [class.active]="view === 'products'" [attr.aria-current]="view === 'products' ? 'page' : null" (click)="navigate('products')"><span aria-hidden="true">▤</span> Termékek</button>
+      </nav>
+      <div class="identity">
+        <span class="avatar" aria-hidden="true">{{ email.slice(0, 1).toUpperCase() }}</span>
+        <span class="identity-email" [title]="email">{{ email }}</span>
+        <button type="button" title="Kijelentkezés" aria-label="Kijelentkezés" [disabled]="busy" (click)="logout()">↪</button>
+      </div>
+    </aside>
+
+    <main class="content">
+      <header class="page-header">
+        <div>
+          @switch (view) {
+            @case ('overview') { <h1>Áttekintés</h1><p>Kiadásaid és havi költségkereted egy helyen.</p> }
+            @case ('expenses') { <h1>Kiadások</h1><p>Keresd vissza vagy szerkeszd a mentett kiadásokat.</p> }
+            @case ('analysis') { <h1>Költéselemzés</h1><p>Kövesd, mire és mely napokon költesz többet.</p> }
+            @case ('products') { <h1>Termékek</h1><p>Szűrd a blokkjaid tételeit terméknév és bolt szerint.</p> }
+          }
+        </div>
+        <div class="actions">
+          <button type="button" class="secondary" [disabled]="busy" (click)="open('import')"><span aria-hidden="true">↑</span> Importálás</button>
+          <button type="button" class="primary" [disabled]="busy" (click)="open('expense')"><span aria-hidden="true">+</span> Új kiadás</button>
+        </div>
+      </header>
+
+      <div class="month-strip">
+        <div class="month-picker">
+          <button type="button" aria-label="Előző hónap" title="Előző hónap" [disabled]="loading" (click)="shiftMonth(-1)">‹</button>
+          <label>{{ monthLabel }}<input type="month" aria-label="Hónap kiválasztása" min="1900-01" max="2099-12" [value]="month" [disabled]="loading" (change)="setMonth($any($event.target).value)"></label>
+          <button type="button" aria-label="Következő hónap" title="Következő hónap" [disabled]="loading" (click)="shiftMonth(1)">›</button>
+        </div>
+        @if (loading) { <span class="muted" role="status">Betöltés…</span> }
+      </div>
+
+      @if (error && !editor.open) { <p class="alert" role="alert">{{ error }}</p> }
+      @if (message) { <p class="success" role="status">{{ message }}</p> }
+
+      @if (summary; as data) {
+        @if (view === 'overview') {
+          <div class="metric-grid">
+            <section class="metric"><h2>Havi kiadás</h2><strong>{{ money(data.total) }}</strong><p>{{ changeLabel }}</p></section>
+            <section class="metric">
+              <div class="heading-row"><h2>Havi keret</h2><button type="button" class="text-button" (click)="open('budget')">{{ data.budget == null ? 'Beállítás' : 'Módosítás' }}</button></div>
+              <strong>{{ money(data.budget) }}</strong>
+              @if (data.budget != null) {
+                <div class="track" role="progressbar" aria-label="Felhasznált havi keret" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="budgetProgress"><i [class.over]="(budgetRemaining ?? 0) < 0" [style.width.%]="budgetProgress"></i></div>
+              } @else { <p>Állíts be egy havi célt</p> }
+            </section>
+            <section class="metric">
+              <h2>{{ (budgetRemaining ?? 0) < 0 ? 'Kerettúllépés' : 'Fennmaradó keret' }}</h2>
+              <strong [class.negative]="(budgetRemaining ?? 0) < 0">{{ money(budgetRemaining == null ? null : budgetRemaining < 0 ? -budgetRemaining : budgetRemaining) }}</strong>
+              <p>{{ data.expenses.length }} rögzített kiadás</p>
+            </section>
+          </div>
+        }
+
+        @if (view === 'overview' || view === 'analysis') {
+          <div class="chart-layout">
+            <section class="card">
+              <div class="card-heading"><h2>Napi kiadások</h2><p>A kiválasztott hónap kiadásai</p></div>
+              @if (data.total > 0) {
+                <div class="daily-chart" aria-label="Kiadás naponként">
+                  @for (day of data.days; track day.day) {
+                    <div class="daily-column" [attr.title]="day.day + '. nap · ' + money(day.amount)">
+                      <i [class.empty-bar]="day.amount === 0" [style.height.%]="day.amount / peakDay * 100"></i>
+                      @if (day.day === 1 || day.day % 5 === 0) { <span>{{ day.day }}</span> }
+                    </div>
+                  }
+                </div>
+              } @else { <div class="empty chart-empty">Ebben a hónapban még nincs rögzített kiadás.</div> }
+            </section>
+
+            <section class="card">
+              <div class="card-heading"><h2>Kategóriák</h2><p>Kiadások megoszlása</p></div>
+              @if (data.categories.length) {
+                <div class="category-list">
+                  @for (category of data.categories; track category.name; let index = $index) {
+                    <div class="category-row">
+                      <div><span>{{ category.name }}</span><strong>{{ money(category.amount) }}</strong></div>
+                      <div class="track"><i [attr.data-tone]="index % 4" [style.width.%]="category.amount / data.total * 100"></i></div>
+                    </div>
+                  }
+                </div>
+              } @else { <div class="empty chart-empty">Az első kiadás után itt jelenik meg a bontás.</div> }
+            </section>
+          </div>
+        }
+
+        @if (view === 'analysis') {
+          <section class="card weekday-card">
+            <div class="card-heading"><h2>Átlagos költés a hét napjain</h2>
+              <p>{{ highestWeekday === '—' ? 'Itt láthatod, melyik napokon költesz többet.' : 'A legmagasabb napi átlag ezen a napon volt: ' + highestWeekday.toLocaleLowerCase('hu') + '.' }}</p>
+            </div>
+            <div class="category-list">
+              @for (day of data.weekdays; track day.index) {
+                <div class="category-row">
+                  <div><span>{{ weekdays[day.index] }}</span><strong>{{ money(day.average) }}</strong></div>
+                  <div class="track"><i [style.width.%]="day.average / peakWeekday * 100"></i></div>
+                </div>
+              }
+            </div>
+          </section>
+        }
+
+        @if (view === 'products') {
+          @if (productReport; as report) {
+            <section class="card expense-card product-card">
+              <div class="product-filters">
+                <label>Terméknév <input type="search" [(ngModel)]="productQuery" placeholder="Például tej vagy kenyér"></label>
+                <label>Bolt <select [(ngModel)]="productMerchant">
+                  <option value="">Minden bolt</option>
+                  @for (merchant of productMerchants; track merchant) { <option [value]="merchant">{{ merchant }}</option> }
+                </select></label>
+              </div>
+              @if (report.rows.length) {
+                <ng-container *ngTemplateOutlet="productResults; context: { $implicit: report }"></ng-container>
+              } @else {
+                <div class="empty">{{ productQuery.trim() || productMerchant ? 'Nincs ilyen tétel a kiválasztott hónapban.' : 'A mentett blokktételek itt jelennek meg.' }}</div>
+              }
+            </section>
+          }
+        }
+
+        @if (view === 'overview' || view === 'expenses') {
+          <section class="card expense-card">
+            <div class="card-heading heading-row">
+              <h2>{{ view === 'overview' ? 'Legutóbbi kiadások' : 'Kiadások ebben a hónapban' }}</h2>
+              @if (view === 'overview' && data.expenses.length) {
+                <button type="button" class="text-button" (click)="navigate('expenses')">Összes kiadás →</button>
+              }
+              @if (view === 'expenses' && data.expenses.length) {
+                <input class="search" type="search" aria-label="Kiadások keresése" placeholder="Bolt, kategória vagy termék" [(ngModel)]="query">
+              }
+            </div>
+            @if (view === 'expenses' ? expenseProductReport : null; as matches) {
+              <ng-container *ngTemplateOutlet="productResults; context: { $implicit: matches }"></ng-container>
+            } @else if (shownExpenses.length) {
+              <div class="table-scroll">
+                <table>
+                  <thead><tr><th scope="col">Kiadás</th><th scope="col">Dátum</th><th scope="col">Kategória</th><th scope="col">Forrás</th><th scope="col" class="right">Összeg</th></tr></thead>
+                  <tbody>
+                    @for (row of shownExpenses; track row.id) {
+                      <tr>
+                        <th scope="row"><button class="entry" type="button" (click)="open('expense', row)">{{ row.merchant }}</button>
+                          @if (row.items.length) { <small>{{ row.items.length }} tétel</small> }
+                        </th>
+                        <td>{{ shortDate(row.date) }}</td><td><span class="pill">{{ row.category }}</span></td>
+                        <td>{{ sources[row.source] }}</td><td class="right total">{{ money(row.amount) }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            } @else {
+              <div class="empty">
+                <p>{{ query ? 'Nincs ilyen találat.' : 'Ehhez a hónaphoz még nincs kiadás.' }}</p>
+                @if (!query) { <button type="button" class="text-button" (click)="open('expense')">Első kiadás rögzítése →</button> }
+              </div>
+            }
+          </section>
+        }
+      }
+    </main>
+  </div>
+}
+
+<ng-template #productResults let-report>
+  <div class="product-summary">
+    <strong>{{ money(report.total) }}</strong>
+    <span>{{ report.rows.length }} tételsor · {{ report.stores.length }} bolt</span>
+  </div>
+  @if (report.stores.length > 1) {
+    <ul class="product-stores" aria-label="A talált tételek összege boltonként">
+      @for (store of report.stores; track store.name) {
+        <li>{{ store.name }} <strong>{{ money(store.amount) }}</strong></li>
+      }
+    </ul>
+  }
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th scope="col">Termék</th><th scope="col">Bolt és blokk</th><th scope="col">Dátum</th><th scope="col" class="right">Tételösszeg</th></tr></thead>
+      <tbody>
+        @for (line of report.rows; track $index) {
+          <tr>
+            <th scope="row">{{ line.item.name }}</th>
+            <td><button type="button" class="entry" (click)="open('expense', line.expense)">{{ line.expense.merchant }}</button></td>
+            <td>{{ shortDate(line.expense.date) }}</td><td class="right total">{{ money(line.item.amount) }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</ng-template>
+
+<dialog #editor class="editor" [class.import-dialog]="dialog === 'import'" (close)="resetEditor()" (cancel)="$event.preventDefault(); close()" aria-labelledby="editor-title">
+  <header class="editor-header">
+    <div>
+      <h2 id="editor-title">{{ deleteTarget ? 'Kiadás törlése' : dialog === 'budget' ? 'Havi költségkeret' : dialog === 'import' ? 'Kiadások importálása' : editing ? 'Kiadás szerkesztése' : 'Új kiadás' }}</h2>
+      @if (dialog === 'budget') { <p>{{ monthLabel }}</p> }
+    </div>
+    <button type="button" class="close" [disabled]="busy" aria-label="Bezárás" (click)="close()">×</button>
+  </header>
+  <form (ngSubmit)="save()">
+    <div class="editor-body">
+      @if (error) { <p class="alert" role="alert">{{ error }}</p> }
+
+      @if (deleteTarget) {
+        <p>Törlöd ezt a kiadást? <strong>{{ deleteTarget.merchant }} · {{ money(deleteTarget.amount) }}</strong></p>
+      } @else if (dialog === 'budget') {
+        <label>Havi keret forintban <input type="number" min="0.01" max="999999999.99" step="0.01" name="budget" [(ngModel)]="budget" placeholder="Például 150000"></label>
+      } @else {
+        @if (dialog === 'import') {
+          <label class="upload">
+            <span class="upload-arrow" aria-hidden="true">↑</span>
+            <strong>{{ fileName || 'Válassz egy fájlt' }}</strong>
+            <span>JPG, PNG, WEBP, TIFF, PDF, XLS, XLSX vagy CSV · legfeljebb 12 MB</span>
+            <input type="file" (change)="upload($event)" [disabled]="busy" accept=".jpg,.jpeg,.png,.webp,.tif,.tiff,.pdf,.xls,.xlsx,.csv">
+          </label>
+          @if (!rows.length && !busy) {
+            <p class="form-hint">Táblázat esetén az első munkalap fejléce legyen Név, Dátum, Összeg. A Kategória opcionális.</p>
+          }
+          @if (busy && !rows.length) { <p role="status">A fájl feldolgozása folyamatban…</p> }
+          @if (warnings.length) {
+            <ul class="warnings">@for (warning of warnings; track $index) { <li>{{ warning }}</li> }</ul>
+          }
+        }
+        @if (rows.length) {
+          @if (dialog === 'import') { <h3>Ellenőrizd az adatokat mentés előtt</h3> }
+          <div class="review" [class.has-photo]="photoUrl">
+            @if (photoUrl) { <figure><img [src]="photoUrl" alt="A feltöltött blokk fotója"></figure> }
+            <div class="drafts">
+              @for (row of rows; track row.id; let index = $index) {
+                <fieldset class="draft">
+                  <legend>{{ rows.length > 1 ? (index + 1) + '. kiadás' : 'Kiadás adatai' }}</legend>
+                  <div class="fields">
+                    <label class="wide">Kiadás neve vagy kereskedő
+                      <input [name]="'name-' + row.id" [(ngModel)]="row.merchant" required maxlength="160" placeholder="Például SPAR">
+                    </label>
+                    <label>Dátum
+                      <input [name]="'date-' + row.id" type="date" [(ngModel)]="row.date" required min="1900-01-01" max="2099-12-31">
+                    </label>
+                    <label>Végösszeg (Ft)
+                      <input [name]="'amount-' + row.id" type="number" [(ngModel)]="row.amount" required min="0.01" max="999999999.99" step="0.01" placeholder="0">
+                    </label>
+                    <label class="wide">Kategória
+                      <select [name]="'category-' + row.id" [(ngModel)]="row.category">
+                        @for (category of categories; track category) { <option [value]="category">{{ category }}</option> }
+                      </select>
+                    </label>
+                  </div>
+                  @if (row.source !== 'spreadsheet') {
+                    <div class="items">
+                      <div class="heading-row"><h3>Blokk tételei</h3><button type="button" class="text-button" [disabled]="row.items.length >= 100" (click)="row.items.push({ name: '', amount: null })">+ Tétel</button></div>
+                      @for (item of row.items; track $index; let itemIndex = $index) {
+                        <div class="item-row">
+                          <input [name]="'item-' + row.id + '-' + itemIndex" [(ngModel)]="item.name" aria-label="Tétel neve" required maxlength="160" placeholder="Tétel neve">
+                          <input [name]="'price-' + row.id + '-' + itemIndex" [(ngModel)]="item.amount" aria-label="Tétel összege forintban" type="number" required step="0.01" min="-999999999.99" max="999999999.99" placeholder="Ft">
+                          <button type="button" class="close" aria-label="Tétel eltávolítása" (click)="row.items.splice(itemIndex, 1)">×</button>
+                        </div>
+                      }
+                      @if (row.items.length) {
+                        <p class="form-hint" [class.negative]="row.amount !== itemTotal(row)">Tételek összege {{ money(itemTotal(row)) }}{{ row.amount !== itemTotal(row) ? ' · Eltér a végösszegtől' : '' }}</p>
+                      }
+                    </div>
+                  }
+                  @if (dialog === 'import' && rows.length > 1) {
+                    <button type="button" class="text-button negative" (click)="rows.splice(index, 1)">Sor kihagyása</button>
+                  }
+                </fieldset>
+              }
+            </div>
+          </div>
+        }
+        @if (extracted) {
+          <details class="extracted"><summary>Felismert szöveg megtekintése</summary><pre>{{ extracted }}</pre></details>
+        }
+      }
+    </div>
+
+    <footer class="editor-footer">
+      @if (editing && !deleteTarget && rows[0]) {
+        <button type="button" class="text-button negative footer-start" [disabled]="busy" (click)="deleteTarget = rows[0]">Törlés</button>
+      }
+      @if (dialog === 'budget' && summary?.budget != null) {
+        <button type="button" class="text-button negative footer-start" [disabled]="busy" (click)="budget = null; save()">Keret törlése</button>
+      }
+      <button type="button" class="secondary" [disabled]="busy" (click)="deleteTarget ? deleteTarget = null : close()">Mégse</button>
+      <button type="submit" [class]="deleteTarget ? 'danger' : 'primary'" [disabled]="busy || (dialog !== 'budget' && !deleteTarget && !rows.length)">{{ busy ? 'Folyamatban…' : deleteTarget ? 'Kiadás törlése' : 'Mentés' }}</button>
+    </footer>
+  </form>
+</dialog>
