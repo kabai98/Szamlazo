@@ -26,6 +26,12 @@ docker compose logs -f app
 
 ## Importálás
 
+A helyi valódi tesztblokk a `test-images/spar-real-receipt.jfif` fájlban található, ha a mintát bemásoltad. A könyvtár Gitből és Docker-buildből kizárt. A blokktételekhez az import mennyiséget, mértékegységet és egységárat is átadhat, a tranzakcióhoz fizetési módot és időpontot. Ezeket új EF Core-migráció tárolja, a korábbi rekordoknál opcionális mezőként.
+
+A fotóhoz perspektíva- és kontrasztjavított OCR-jelölt is készül. A felismerést mentés előtt ellenőrizni kell, különösen a ferde, hajtott vagy halvány blokkoknál.
+
+A mellékelt valódi SPAR-fotó automatikus felismerése még pontatlan. A tételértelmező javított szövegből kezeli a négy terméket, a súlyokat és a Mastercard fizetést, de a fényképből kiolvasott eredményt jelenleg kézzel kell javítani.
+
 A Kiadások keresője terméknévre a hozzá tartozó tételsorokat és azok összegét mutatja. A Termékek lapon ezen belül konkrét boltra is szűrhetsz.
 
 - **Fénykép**. JPG, PNG, WEBP és TIFF. A konténer helyi Tesseract OCR-t futtat magyar és angol nyelvi modellel.

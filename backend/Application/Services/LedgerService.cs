@@ -97,20 +97,27 @@ public sealed class LedgerService(ILedgerStore store)
             if (name is not { Length: > 0 and <= 160 } || item?.Amount is not { } price || !Money.IsValid(price, positive: false))
                 throw InvalidExpense();
 
-            items.Add(new ExpenseItem { Name = name, AmountMinor = Money.ToMinor(price) });
+            if (item.Quantity is <= 0 or > 100000 || item.Unit is { Length: > 12 } ||
+                item.UnitPrice is { } unitPrice && !Money.IsValid(unitPrice, positive: true))
+                throw InvalidExpense();
+            items.Add(new ExpenseItem { Name = name, AmountMinor = Money.ToMinor(price),
+                Quantity = item.Quantity, Unit = item.Unit, UnitPrice = item.UnitPrice });
         }
 
         return new Expense
         {
             OwnerId = owner, Id = id, Merchant = merchant, Date = date, AmountMinor = Money.ToMinor(amount),
-            Category = category.Value, Source = source, Items = items
+            Category = category.Value, Source = source, Items = items,
+            PaymentMethod = input.PaymentMethod is { Length: <= 40 } ? input.PaymentMethod : null,
+            TransactionTime = input.TransactionTime
         };
     }
 
     private static ExpenseDto ToDto(Expense expense) =>
         new(expense.Id, expense.Merchant, expense.Date, SpendingCategories.Label(expense.Category), expense.Source,
             Money.FromMinor(expense.AmountMinor), expense.Items.Select(item =>
-                new ItemDto(item.Name, Money.FromMinor(item.AmountMinor))).ToArray());
+                new ItemDto(item.Name, Money.FromMinor(item.AmountMinor), item.Quantity, item.Unit, item.UnitPrice)).ToArray(),
+            expense.PaymentMethod, expense.TransactionTime);
 
     private static bool TryMonth(string? month, out DateOnly start) =>
         DateOnly.TryParseExact(month + "-01", "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out start)

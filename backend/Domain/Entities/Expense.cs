@@ -8,6 +8,8 @@ public sealed class Expense
     public string OwnerId { get; set; } = "";
     public string Merchant { get; set; } = "";
     public DateOnly Date { get; set; }
+    public string? PaymentMethod { get; set; }
+    public TimeOnly? TransactionTime { get; set; }
     public long AmountMinor { get; set; }
     public SpendingCategory Category { get; set; }
     public ExpenseSource Source { get; set; }
