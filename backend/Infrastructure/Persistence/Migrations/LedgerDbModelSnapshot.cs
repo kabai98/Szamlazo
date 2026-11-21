@@ -183,8 +183,14 @@ namespace Szamlazo.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("PaymentMethod")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Source")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<TimeOnly?>("TransactionTime")
                         .HasColumnType("TEXT");
 
                     b.HasKey("OwnerId", "Id");
@@ -327,6 +333,15 @@ namespace Szamlazo.Infrastructure.Persistence.Migrations
 
                             b1.Property<string>("Name")
                                 .IsRequired()
+                                .HasColumnType("TEXT");
+
+                            b1.Property<decimal?>("Quantity")
+                                .HasColumnType("TEXT");
+
+                            b1.Property<string>("Unit")
+                                .HasColumnType("TEXT");
+
+                            b1.Property<decimal?>("UnitPrice")
                                 .HasColumnType("TEXT");
 
                             b1.HasKey("OwnerId", "ExpenseId", "Id");

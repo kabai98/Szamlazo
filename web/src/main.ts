@@ -6,7 +6,7 @@ import { FormsModule } from '@angular/forms';
 type Source = 'manual' | 'pdf' | 'image' | 'spreadsheet';
 type View = 'overview' | 'expenses' | 'analysis' | 'products';
 type Dialog = 'expense' | 'import' | 'budget';
-interface Item { name: string; amount: number | null; }
+interface Item { name: string; amount: number | null; quantity?: number; unit?: string; unitPrice?: number; }
 interface Expense {
   id: string;
   merchant: string;
@@ -15,6 +15,8 @@ interface Expense {
   category: string;
   source: Source;
   items: Item[];
+  paymentMethod?: string;
+  transactionTime?: string;
 }
 interface ProductLine {
   item: Item;

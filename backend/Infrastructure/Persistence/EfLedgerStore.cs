@@ -36,6 +36,8 @@ internal sealed class EfLedgerStore(LedgerDb db) : ILedgerStore
         if (expense is null)
             return false;
 
+        expense.PaymentMethod = updated.PaymentMethod;
+        expense.TransactionTime = updated.TransactionTime;
         expense.Merchant = updated.Merchant;
         expense.Date = updated.Date;
         expense.AmountMinor = updated.AmountMinor;

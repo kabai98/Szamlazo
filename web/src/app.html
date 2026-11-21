@@ -254,7 +254,7 @@
             <span class="upload-arrow" aria-hidden="true">↑</span>
             <strong>{{ fileName || 'Válassz egy fájlt' }}</strong>
             <span>JPG, PNG, WEBP, TIFF, PDF, XLS, XLSX vagy CSV · legfeljebb 12 MB</span>
-            <input type="file" (change)="upload($event)" [disabled]="busy" accept=".jpg,.jpeg,.png,.webp,.tif,.tiff,.pdf,.xls,.xlsx,.csv">
+            <input type="file" (change)="upload($event)" [disabled]="busy" accept=".jfif,.jpg,.jpeg,.png,.webp,.tif,.tiff,.pdf,.xls,.xlsx,.csv">
           </label>
           @if (!rows.length && !busy) {
             <p class="form-hint">Táblázat esetén az első munkalap fejléce legyen Név, Dátum, Összeg. A Kategória opcionális.</p>
@@ -291,7 +291,9 @@
                   @if (row.source !== 'spreadsheet') {
                     <div class="items">
                       <div class="heading-row"><h3>Blokk tételei</h3><button type="button" class="text-button" [disabled]="row.items.length >= 100" (click)="row.items.push({ name: '', amount: null })">+ Tétel</button></div>
+                      <p>{{ row.paymentMethod }} {{ row.transactionTime }}</p>
                       @for (item of row.items; track $index; let itemIndex = $index) {
+                        <p class="form-hint">{{ item.quantity }} {{ item.unit }} {{ item.unitPrice ? money(item.unitPrice) : "" }}</p>
                         <div class="item-row">
                           <input [name]="'item-' + row.id + '-' + itemIndex" [(ngModel)]="item.name" aria-label="Tétel neve" required maxlength="160" placeholder="Tétel neve">
                           <input [name]="'price-' + row.id + '-' + itemIndex" [(ngModel)]="item.amount" aria-label="Tétel összege forintban" type="number" required step="0.01" min="-999999999.99" max="999999999.99" placeholder="Ft">

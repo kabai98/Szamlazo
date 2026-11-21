@@ -18,7 +18,7 @@ COPY --from=web /src/dist/szamlazo/browser/ api/wwwroot/
 RUN dotnet publish api/Szamlazo.Api.csproj --no-restore -c Release -o /publish
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
-RUN apt-get update && apt-get install -y --no-install-recommends poppler-utils tesseract-ocr tesseract-ocr-hun tesseract-ocr-eng \
+RUN apt-get update && apt-get install -y --no-install-recommends python3-opencv poppler-utils tesseract-ocr tesseract-ocr-hun tesseract-ocr-eng \
     && rm -rf /var/lib/apt/lists/* && install -d -o app -g app /data
 WORKDIR /app
 COPY --from=build /publish/ ./
