@@ -11,3 +11,6 @@ data/
 *.wav
 
 test-images/
+local-config/
+.env
+**/__pycache__/

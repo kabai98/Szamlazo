@@ -16,6 +16,9 @@ public static class DependencyInjection
         var connectionString = new SqliteConnectionStringBuilder { DataSource = Path.Combine(storage, "ledger.db") }.ToString();
         services.AddDbContext<LedgerDb>(options => options.UseSqlite(connectionString));
         services.AddScoped<ILedgerStore, EfLedgerStore>();
+        services.AddSingleton<ExternalToolRunner>();
+        services.AddSingleton<ImageOcrService>();
+        services.AddSingleton<PdfTextReader>();
         services.AddSingleton<IDocumentReader, DocumentReader>();
         services.AddIdentity<Account, IdentityRole>(options =>
         {

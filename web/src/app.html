@@ -294,9 +294,15 @@
                       <p>{{ row.paymentMethod }} {{ row.transactionTime }}</p>
                       @for (item of row.items; track $index; let itemIndex = $index) {
                         <p class="form-hint">{{ item.quantity }} {{ item.unit }} {{ item.unitPrice ? money(item.unitPrice) : "" }}</p>
+                        <label>Tétel típusa
+                          <select [name]="'kind-' + row.id + '-' + itemIndex" [ngModel]="item.kind || 'product'" (ngModelChange)="item.kind = $event; item.amount = null">
+                            <option value="product">Termék</option>
+                            <option value="discount">Kedvezmény</option>
+                          </select>
+                        </label>
                         <div class="item-row">
                           <input [name]="'item-' + row.id + '-' + itemIndex" [(ngModel)]="item.name" aria-label="Tétel neve" required maxlength="160" placeholder="Tétel neve">
-                          <input [name]="'price-' + row.id + '-' + itemIndex" [(ngModel)]="item.amount" aria-label="Tétel összege forintban" type="number" required step="0.01" min="-999999999.99" max="999999999.99" placeholder="Ft">
+                          <input [name]="'price-' + row.id + '-' + itemIndex" [(ngModel)]="item.amount" aria-label="Tétel összege forintban" type="number" required step="0.01" [min]="item.kind === 'discount' ? -999999999.99 : 0" [max]="item.kind === 'discount' ? -0.01 : 999999999.99" (keydown)="$event.key === '-' && item.kind !== 'discount' && $event.preventDefault()" placeholder="Ft">
                           <button type="button" class="close" aria-label="Tétel eltávolítása" (click)="row.items.splice(itemIndex, 1)">×</button>
                         </div>
                       }

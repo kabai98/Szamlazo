@@ -6,7 +6,7 @@ import { FormsModule } from '@angular/forms';
 type Source = 'manual' | 'pdf' | 'image' | 'spreadsheet';
 type View = 'overview' | 'expenses' | 'analysis' | 'products';
 type Dialog = 'expense' | 'import' | 'budget';
-interface Item { name: string; amount: number | null; quantity?: number; unit?: string; unitPrice?: number; }
+interface Item { name: string; amount: number | null; quantity?: number; unit?: string; unitPrice?: number; kind?: 'product' | 'discount'; }
 interface Expense {
   id: string;
   merchant: string;
@@ -274,6 +274,10 @@ class App {
         const first = this.rows[0];
         if (!first || this.rows.some(row => !row.merchant.trim() || !row.date || row.amount == null || row.amount <= 0)) {
           throw new Error('Minden kiadáshoz adj meg nevet, dátumot és pozitív összeget.');
+        }
+        if (this.rows.some(row => row.items.some(item => item.amount == null ||
+          !Number.isFinite(item.amount) || (item.kind === 'discount' ? item.amount >= 0 : item.amount < 0)))) {
+          throw new Error('A termék ára legalább 0 Ft, a kedvezmény összege negatív legyen.');
         }
         if (this.editing) await this.request('/expenses/' + first.id, 'PUT', first);
         else await this.request('/expenses', 'POST', this.rows);

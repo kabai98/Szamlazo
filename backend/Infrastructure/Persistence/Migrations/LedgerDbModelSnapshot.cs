@@ -331,6 +331,9 @@ namespace Szamlazo.Infrastructure.Persistence.Migrations
                             b1.Property<long>("AmountMinor")
                                 .HasColumnType("INTEGER");
 
+                            b1.Property<int>("Kind")
+                                .HasColumnType("INTEGER");
+
                             b1.Property<string>("Name")
                                 .IsRequired()
                                 .HasColumnType("TEXT");
