@@ -47,6 +47,8 @@ For image preprocessing changes, run `python -m unittest discover -s tests/ocr` 
 
 ## Commits and Pull Requests
 
-Start feature branches from `develop`. Use descriptive English names such as `feature/real-store-receipt-import`.
+Before starting each new task, fetch the latest remote branches, switch to `develop`, and update it with `git pull --ff-only origin develop`. Create a new branch whose English name describes the task, such as `feature/real-store-receipt-import` or `fix/receipt-price-matching`. Do not start new work on `main`, `develop`, or a completed feature branch.
+
+After completing the requested work, required checks, and authorized commit/push, automatically switch back to `main` and run `git pull --ff-only origin main`. This checkout does not merge the feature branch; merging remains a separate action. Only switch branches with a clean working tree. If local changes or diverging history prevent checkout or fast-forwarding, preserve them and report the blocker; never discard changes, reset history, or force-push to complete this workflow.
 
 Follow the initial commit’s short English subject style. In PRs, describe the change and verification, link related issues, and include screenshots for UI changes. Keep SQLite data, session keys, and real receipts out of Git.
