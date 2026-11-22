@@ -94,14 +94,14 @@ public sealed class LedgerService(ILedgerStore store)
         foreach (var item in input.Items ?? [])
         {
             var name = item?.Name?.Trim();
-            if (name is not { Length: > 0 and <= 160 } || item?.Amount is not { } price || !Money.IsValid(price, positive: false))
+            if (name is not { Length: > 0 and <= 160 } || item?.Amount is not { } price || !ExpenseItemRules.IsValidAmount(price, item.Kind))
                 throw InvalidExpense();
 
             if (item.Quantity is <= 0 or > 100000 || item.Unit is { Length: > 12 } ||
                 item.UnitPrice is { } unitPrice && !Money.IsValid(unitPrice, positive: true))
                 throw InvalidExpense();
             items.Add(new ExpenseItem { Name = name, AmountMinor = Money.ToMinor(price),
-                Quantity = item.Quantity, Unit = item.Unit, UnitPrice = item.UnitPrice });
+                Quantity = item.Quantity, Unit = item.Unit, UnitPrice = item.UnitPrice, Kind = item.Kind });
         }
 
         return new Expense
@@ -116,7 +116,7 @@ public sealed class LedgerService(ILedgerStore store)
     private static ExpenseDto ToDto(Expense expense) =>
         new(expense.Id, expense.Merchant, expense.Date, SpendingCategories.Label(expense.Category), expense.Source,
             Money.FromMinor(expense.AmountMinor), expense.Items.Select(item =>
-                new ItemDto(item.Name, Money.FromMinor(item.AmountMinor), item.Quantity, item.Unit, item.UnitPrice)).ToArray(),
+                new ItemDto(item.Name, Money.FromMinor(item.AmountMinor), item.Quantity, item.Unit, item.UnitPrice, item.Kind)).ToArray(),
             expense.PaymentMethod, expense.TransactionTime);
 
     private static bool TryMonth(string? month, out DateOnly start) =>

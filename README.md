@@ -30,6 +30,16 @@ A helyi valódi tesztblokk a `test-images/spar-real-receipt.jfif` fájlban talá
 
 A fotóhoz perspektíva- és kontrasztjavított OCR-jelölt is készül. A felismerést mentés előtt ellenőrizni kell, különösen a ferde, hajtott vagy halvány blokkoknál.
 
+A képfeldolgozás menete a `backend/Infrastructure/Importing/` könyvtárban követhető:
+
+1. `DocumentReader` ellenőrzi a fájltípust, kezeli az időkorlátot és az ideiglenes fájlokat.
+2. `PdfTextReader` PDF-ből először szöveget olvas; csak a szkennelt oldalakat adja OCR-re. Az Excel/CSV külön a `SpreadsheetReader` feladata.
+3. `ImageOcrService` választja az OCR-motort. Tesseract esetén az eredeti képet és két OpenCV-változatot vizsgál, egyenként két szegmentálási móddal. Az `Ocr__Engine=paddle` a külön telepítendő PaddleOCR-t választja.
+4. `ExternalToolRunner` futtatja a helyi eszközöket, továbbítja a megszakítást és leállítja a folyamatokat. A `Tools__python3` és hasonló beállításokkal megadható az eszközök elérési útja.
+5. `ReceiptParser` előnézetté alakítja a szöveget. A részösszeg és a megtakarítás összesítése nem termék; a negatív kedvezmény külön tétel. Az eltérő összegek és a hiányzó mezők ellenőrzést igényelnek.
+
+A PaddleOCR segédprogram megőrzi a felismert szövegdobozok koordinátáit a diagnosztikai JSON-ban. Az alkalmazás jelenleg a rendezett szöveget dolgozza fel; a térbeli termék–ár párosítás még finomítandó. Lokális LLM nincs bekötve.
+
 A mellékelt valódi SPAR-fotó automatikus felismerése még pontatlan. A tételértelmező javított szövegből kezeli a négy terméket, a súlyokat és a Mastercard fizetést, de a fényképből kiolvasott eredményt jelenleg kézzel kell javítani.
 
 A Kiadások keresője terméknévre a hozzá tartozó tételsorokat és azok összegét mutatja. A Termékek lapon ezen belül konkrét boltra is szűrhetsz.
@@ -72,6 +82,8 @@ dotnet ef migrations add ValtozasNeve --project backend/Infrastructure --startup
 ```
 
 ## Build ellenőrzése
+
+Az xUnit-tesztek futtatása: `dotnet test tests/Szamlazo.Tests/Szamlazo.Tests.csproj`. A terméktételek ára legalább 0 Ft lehet, negatív összeg a külön Kedvezmény típushoz tartozhat. A korábbi negatív tételeket az adatmegőrző migráció kedvezményként jelöli.
 
 ```powershell
 dotnet build Szamlazo.slnx

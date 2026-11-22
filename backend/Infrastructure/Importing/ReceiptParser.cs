@@ -1,12 +1,5 @@
-using System.ComponentModel;
-using System.Diagnostics;
 using System.Globalization;
-using System.IO.Compression;
-using System.Text;
 using System.Text.RegularExpressions;
-using ExcelDataReader;
-using Microsoft.Extensions.Configuration;
-using Szamlazo.Application.Contracts;
 using Szamlazo.Application.Dtos;
 using Szamlazo.Domain;
 using Szamlazo.Domain.Enums;
@@ -31,11 +24,13 @@ internal static partial class ReceiptParser
             line.Contains("KIAL LITAS DATUMA") || line.Contains("KIALLITAS DATUMA") || line.StartsWith("DATUM"));
         if (dateLine >= 0)
             date = ParseDate(lines[dateLine]) ?? ParseDate(lines.ElementAtOrDefault(dateLine + 1));
-        date ??= lines.Select(ParseDate).FirstOrDefault(value => value.HasValue);
+        date ??= lines.Where((_, index) => !Regex.IsMatch(normalized[index],
+                @"\b(PONTGYUJTES|PROMOCIO|ERVENYES|TART|AKCIO)\b"))
+            .Select(ParseDate).FirstOrDefault(value => value.HasValue);
 
         decimal? total = null;
         var totalLine = lines.Length;
-        foreach (var pattern in new[] { @"FIZETENDO|FIZETNI|VEGOSSZEG", @"(?:^|\s)(?:MIND)?OSSZESEN\b", @"TOTAL|BRUTTO OSSZEG" })
+        foreach (var pattern in new[] { @"FIZETENDO|FIZETNI|VEGOSSZEG", @"(?:^|\s)(?:MIND)?OSSZESEN\b", @"TOTAL|BRUTTO OSSZEG", @"MASTERCARD|VISA|BANKKARTYA|OSSZEG/AMOUNT" })
         {
             for (var i = 0; i < lines.Length; i++)
             {
@@ -67,10 +62,12 @@ internal static partial class ReceiptParser
         if (total is null) warnings.Add("A fizetendő végösszeg ellenőrzést igényel.");
 
         var items = ReadItems(lines, normalized, totalLine, merchant);
+        if (items.Count == 0)
+            warnings.Add("Nem sikerült terméktételeket felismerni. Add meg vagy ellenőrizd őket mentés előtt.");
         if (items.Count > 0 && total.HasValue && items.Sum(x => x.Amount) != total)
             warnings.Add("A felismert tételek összege eltér a végösszegtől. Ellenőrizd a tételeket és a kedvezményeket.");
 
-        return new ImportPreview([new(merchant, date, total, SuggestCategory(merchant ?? ""), source, items, normalized.Any(line => line.Contains("MASTERCARD")) ? "Mastercard" : null, ReadTime(text))],
+        return new ImportPreview([new(merchant, date, total, SuggestCategory(merchant ?? ""), source, items, ReadPayment(normalized), ReadTime(text))],
             warnings, text[..Math.Min(text.Length, 20000)].Trim());
     }
 
@@ -97,6 +94,15 @@ internal static partial class ReceiptParser
             char.IsLetter(line[0]) && !Regex.IsMatch(Normalize(line), @"^(SZAMLA|NYUGTA|ADOBIZONYLAT|DATUM|VEVO)\b"));
     }
 
+    private static string? ReadPayment(string[] lines)
+    {
+        if (lines.Any(line => line.Contains("MASTERCARD"))) return "Mastercard";
+        if (lines.Any(line => line.Contains("VISA"))) return "Visa";
+        if (lines.Any(line => line.Contains("BANKKARTYA"))) return "Bankkártya";
+        if (lines.Any(line => line.Contains("KESZPENZ"))) return "Készpénz";
+        return null;
+    }
+
     private static TimeOnly? ReadTime(string text)
     {
         var match = Regex.Match(text, @"20\d{2}[.\/-]\s*\d{1,2}[.\/-]\s*\d{1,2}\.?\s+(\d{2}:\d{2})");
@@ -106,54 +112,78 @@ internal static partial class ReceiptParser
     private static List<ItemInput> ReadItems(string[] lines, string[] normalized, int end, string? merchant)
     {
         var items = new List<ItemInput>();
-        string? pending = null;
-        var header = Array.FindIndex(normalized, line => Regex.IsMatch(line, @"(MEGNEVEZES|TERMEK).*(OSSZEG|EGYSEGAR|MENNYISEG|BRUTTO)"));
-        if (end == lines.Length)
-            return items;
-        var first = header >= 0 && header < end ? header + 1 : 1;
-        for (var i = first; i < end && items.Count < 100; i++)
+        string? pendingName = null;
+        (decimal Quantity, string Unit, decimal? Price)? pendingQuantity = null;
+        var header = Array.FindIndex(normalized, line => line.Contains("MEGNEVEZES"));
+        var receipt = Array.FindIndex(normalized, line => line.Contains("NYUGTA"));
+        var first = Math.Max(header, receipt) + 1;
+        if (first == 0)
         {
-            var line = normalized[i];
-            var tagged = Regex.Match(lines[i], @"^[ABC]\d{2}\s+(?<name>.+)", RegexOptions.IgnoreCase);
-            if (tagged.Success)
-                pending = tagged.Groups["name"].Value;
-            var weighted = Regex.Match(line, @"(?<q>\d+[.,]\d+)\s*(?<u>KG|DB|L)\s*[X×*]\s*(?<p>\d+[.,]?\d*)\s*FT");
-            if (weighted.Success && pending is not null)
+            first = Array.FindIndex(normalized, line => Regex.IsMatch(line,
+                @"^[A-E][0O]{2}\s|[A-E][0O]{2}$"));
+            if (first < 0)
+                return items;
+        }
+
+        for (var index = first; index < end && items.Count < 100; index++)
+        {
+            var line = lines[index];
+            var normalizedLine = normalized[index];
+            if (Regex.IsMatch(normalizedLine,
+                @"\b(ADOSZAM|NYUGTA|SZAMLA|PENZTAR|KASSZA|FIZETENDO|NETTO|AFA|OSSZESEN|TELEFON|BANKKARTYA|KESZPENZ|MEGTAKARITAS|RESZOSSZEG)\b") ||
+                ParseDate(line).HasValue)
+                continue;
+
+            var quantity = Regex.Match(normalizedLine,
+                @"(?<q>\d+(?:[.,]\d+)?)\s*(?<u>KG|DB|L)\s*[X×*]\s*(?<p>\d+(?:[.,]\d+)?)\s*FT\s*/?\s*(?:KG|DB|L)?");
+            var trailing = TrailingAmount().Match(line);
+            if (quantity.Success)
             {
-                var trailing = TrailingAmount().Match(lines[i]);
-                decimal? amount = trailing.Success && trailing.Index > weighted.Index + weighted.Length
+                pendingQuantity = (decimal.Parse(quantity.Groups["q"].Value.Replace(',', '.'), CultureInfo.InvariantCulture),
+                    quantity.Groups["u"].Value.ToLowerInvariant(), ParseAmount(quantity.Groups["p"].Value));
+                decimal? value = trailing.Success && trailing.Index >= quantity.Index + quantity.Length
                     ? ParseAmount(trailing.Groups["amount"].Value) : null;
-                if (amount is null && i + 1 < end && Regex.IsMatch(lines[i + 1], @"^\d[\d .,]*$"))
-                    amount = ParseAmount(lines[++i]);
-                if (amount.HasValue)
+                if (value is null && pendingName is not null && index + 1 < end &&
+                    Regex.IsMatch(lines[index + 1], @"^\d[\d .,]*$"))
+                    value = ParseAmount(lines[++index]);
+                if (value.HasValue && pendingName is not null)
                 {
-                    items.Add(new ItemInput(pending, amount,
-                        decimal.Parse(weighted.Groups["q"].Value.Replace(',', '.'), CultureInfo.InvariantCulture),
-                        weighted.Groups["u"].Value.ToLowerInvariant(), ParseAmount(weighted.Groups["p"].Value)));
-                    pending = null;
+                    AddItem(pendingName, value.Value);
+                    pendingName = null;
                 }
                 continue;
             }
 
-            if (ParseDate(lines[i]).HasValue || Regex.IsMatch(line,
-                @"\b(ADOSZAM|NYUGTA|SZAMLA|PENZTAR|KASSZA|UGYFELSZOLGALAT|FIZETENDO|NETTO|AFA|OSSZESEN|TELEFON|UTCA|BANKKARTYA|KESZPENZ)\b"))
-                continue;
-            var price = TrailingAmount().Match(lines[i]);
-            if (!price.Success || price.Index == 0)
-                continue;
-            var name = Regex.Replace(lines[i][..price.Index].Trim(' ', ':', '.'), @"^[ABC]\d{2}\s+", "");
+            var name = trailing.Success ? line[..trailing.Index].Trim(' ', ':', '.') : line;
+            name = Regex.Replace(name, @"^(?:e)?[A-E][0O]{2}\s+", "", RegexOptions.IgnoreCase).Trim();
             if (name.Length is < 2 or > 160 || name == merchant || !name.Any(char.IsLetter))
                 continue;
-            if (ParseAmount(price.Groups["amount"].Value) is { } value && Money.IsValid(value, positive: false))
-                items.Add(new ItemInput(name, value));
+            if (trailing.Success && ParseAmount(trailing.Groups["amount"].Value) is { } amount &&
+                Money.IsValid(amount, positive: false))
+            {
+                AddItem(name, amount);
+                pendingName = null;
+            }
+            else if (Regex.IsMatch(normalizedLine, @"^(?:E)?[A-E][0O]{2}\s"))
+            {
+                pendingName = name;
+            }
         }
         return items;
+
+        void AddItem(string name, decimal amount)
+        {
+            items.Add(new ItemInput(name, amount, pendingQuantity?.Quantity,
+                pendingQuantity?.Unit, pendingQuantity?.Price,
+                amount < 0 ? ExpenseItemKind.Discount : ExpenseItemKind.Product));
+            pendingQuantity = null;
+        }
     }
 
     public static string SuggestCategory(string value) =>
         Shops.Any(shop => Regex.IsMatch(Normalize(value), @"\b" + shop.Match + @"\b")) ? "Élelmiszer" : "Egyéb";
 
-    [GeneratedRegex(@"(?<!\S)(?<amount>[-−]?(?:\d{1,3}(?:[ .,\u00a0\u202f]\d{3})+|\d+)(?:[.,]\d{1,2})?)(?:\s*(?:Ft\.?|HUF))?(?:\s+[A-E]\d{0,2})?\s*$",
+    [GeneratedRegex(@"(?<!\S)(?<amount>[-−]?(?:\d{1,3}(?:[ .,\u00a0\u202f]\d{3})+|\d+)(?:[.,]\d{1,2})?)(?:\s*(?:Ft\.?|HUF))?(?:\s+(?:e)?[A-E][0O]{0,2})?\s*$",
         RegexOptions.IgnoreCase)]
     private static partial Regex TrailingAmount();
 }

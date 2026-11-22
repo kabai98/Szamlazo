@@ -12,4 +12,7 @@
   <Folder Name="/backend/Infrastructure/">
     <Project Path="backend/Infrastructure/Szamlazo.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Szamlazo.Tests/Szamlazo.Tests.csproj" />
+  </Folder>
 </Solution>

@@ -1,12 +1,8 @@
-using System.ComponentModel;
-using System.Diagnostics;
 using System.Globalization;
 using System.IO.Compression;
 using System.Text;
 using System.Text.RegularExpressions;
 using ExcelDataReader;
-using Microsoft.Extensions.Configuration;
-using Szamlazo.Application.Contracts;
 using Szamlazo.Application.Dtos;
 using Szamlazo.Domain;
 using Szamlazo.Domain.Enums;

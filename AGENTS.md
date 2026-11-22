@@ -18,7 +18,7 @@ Apply these boundaries to every backend change. Dependencies point inward toward
 - `dotnet build Szamlazo.slnx` builds the backend solution.
 - `npm.cmd --prefix web ci` installs dependencies from the lockfile. `npm.cmd --prefix web run build` compiles the frontend.
 - `docker compose up --build -d` starts the app at `http://localhost:8087` with OCR and PDF tools.
-- For live frontend development, run `dotnet run --project api --no-launch-profile --urls http://localhost:5094` and `npm.cmd --prefix web start` in separate terminals. The Angular proxy expects port 5094.
+- For live frontend development, start Docker and run `npm.cmd --prefix web start`. The Angular proxy targets the Docker API at port 8087.
 
 ## EF Core Migrations
 
@@ -28,9 +28,22 @@ For schema changes, use the EF command in `README.md`. Add a descriptively named
 
 Use four spaces in C# and two in TypeScript, HTML, and CSS. Use file-scoped C# namespaces, PascalCase public members, and `Async` for asynchronous service methods. Prefer small, single-purpose methods and descriptive names. Reuse existing logic before adding abstractions. Keep user-facing copy in Hungarian.
 
+## Receipt Image Processing
+
+For receipt-image work, use the `receipt-image-processing` skill when available. Apply these rules even when the skill is unavailable:
+
+- Keep originals intact and private samples/debug output in ignored directories. Preserve the original as an OCR candidate when cropping is uncertain.
+- Detect paper boundaries, correct orientation and perspective, and compare a bounded set of preprocessing variants. Preserve names, prices, dates, and minus signs; inspect the resulting crop.
+- Keep PDF text extraction and spreadsheet readers separate from image OCR. Keep external processes and image processing in Infrastructure.
+- Preserve unknown fields and spatial OCR evidence. Never invent prices to reconcile a receipt. Exclude subtotals and savings summaries from purchase items; retain explicit discounts.
+- Use VAT markers such as `B00`/`BOO` and `C00`/`COO` as item-location evidence before or after product text. Combine them with other receipt cues; a marker alone does not establish a purchase, and discount lines may also carry one.
+- Test synthetic receipts and measure real samples by field and item-price pairing. Verify upload, preview, correction, save, reload, and account isolation. Report remaining uncertainty.
+
 ## Testing
 
-The repository has no automated test suite or coverage threshold. Run both builds, then smoke-test the affected workflow in Docker. For import changes, use synthetic receipts and verify preview, correction, save, and reload. Check that another account cannot access saved expenses.
+Run `dotnet test tests/Szamlazo.Tests/Szamlazo.Tests.csproj` for xUnit validation and SQLite migration tests. There is no coverage threshold. Run both builds, then smoke-test the affected workflow in Docker. For import changes, use synthetic receipts and verify preview, correction, save, and reload. Check that another account cannot access saved expenses.
+
+For image preprocessing changes, run `python -m unittest discover -s tests/ocr` in an environment with OpenCV and NumPy.
 
 ## Commits and Pull Requests
 
