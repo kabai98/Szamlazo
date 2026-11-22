@@ -1,0 +1,29 @@
+<section class="section-heading"><div><p class="eyebrow">01 · ÚJ BLOKK</p><h1>Egy fotó, és indulhat.</h1></div></section>
+<p class="muted intro">Legyen rajta a bolt neve, az összes termék és a végösszeg. Fotózz szemből, jó fényben.</p>
+<input #cameraInput class="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp,image/tiff,.jfif" capture="environment" [disabled]="busy()" (change)="selectFromBrowser($event)" aria-label="Blokk fotózása">
+<input #galleryInput class="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp,image/tiff,.jfif" [disabled]="busy()" (change)="selectFromBrowser($event)" aria-label="Blokk kiválasztása">
+@if (!file()) {
+  <div class="scan-target surface"><div class="scan-corners"><ion-icon name="scan-outline" aria-hidden="true" /></div><h2>Mi volt a kosaradban?</h2><p class="muted">Fotózz le egy blokkot, vagy válassz<br>egy korábban elkészített képet.</p></div>
+}
+<div class="capture-buttons">
+  <ion-button expand="block" [disabled]="busy()" (click)="photos.native ? capture('camera') : cameraInput.click()"><ion-icon name="camera-outline" slot="start" /> Fotó készítése</ion-button>
+  <ion-button expand="block" fill="outline" [disabled]="busy()" (click)="photos.native ? capture('gallery') : galleryInput.click()"><ion-icon name="images-outline" slot="start" /> Galériából</ion-button>
+</div>
+@if (file(); as selected) {
+  <article class="surface photo-card">
+    <img [src]="photoUrl()" alt="A feldolgozásra kiválasztott blokk" (error)="$any($event.target).hidden = true">
+    <div class="photo-caption"><div><strong>{{ selected.name }}</strong><small>{{ (selected.size / 1024 / 1024).toFixed(1) }} MB · maximum 12 MB</small></div>
+      <ion-button fill="clear" color="medium" aria-label="Kép elvetése" [disabled]="busy()" (click)="reset()"><ion-icon name="close-outline" /></ion-button></div>
+  </article>
+  @if (!rows().length) { <ion-button expand="block" [disabled]="busy()" (click)="upload()"><ion-icon name="arrow-forward-outline" slot="end" /> Feltöltés és felismerés</ion-button> }
+}
+@if (busy()) { <div class="working" role="status" aria-live="polite"><ion-spinner name="crescent" /><p>{{ phase() }}</p><small>Ez akár két percet is igénybe vehet.</small></div> }
+@if (error() || photos.restoredError()) { <p class="notice error" role="alert">{{ error() || photos.restoredError() }}</p> }
+@if (rows().length) {
+  <fieldset [disabled]="busy()" class="review-fields" [attr.inert]="busy() ? '' : null">
+    @if (warnings().length) { <div class="notice warning"><strong>Néhány adat ellenőrzést igényel</strong><ul>@for (warning of warnings(); track $index) { <li>{{ warning }}</li> }</ul></div> }
+    <app-review [rows]="rows()" [categories]="api.categories()" [confirmed]="confirmed()" (confirmedChange)="confirmed.set($event)" />
+  </fieldset>
+  <ion-button expand="block" [disabled]="busy() || !confirmed()" (click)="save()"><ion-icon name="checkmark-circle-outline" slot="start" /> Kiadás mentése</ion-button>
+}
+<p class="privacy-note">A kép csak a feltöltés gombbal jut el a szerverre. Jelenleg a feldolgozás után törlődik; a jóváhagyott adatok menthetők.</p>

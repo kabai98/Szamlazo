@@ -1,0 +1,69 @@
+<ion-app>
+  <ion-header class="ion-no-border"><ion-toolbar>
+    <ion-title><span class="wordmark">számlázó<span class="brand-dot">.</span></span></ion-title>
+    @if (api.email()) { <ion-button slot="end" fill="clear" [disabled]="busy()" aria-label="Kijelentkezés" (click)="logout()"><ion-icon name="log-out-outline" /></ion-button> }
+  </ion-toolbar></ion-header>
+  <ion-content [fullscreen]="false">
+    <main class="app-shell" [class.auth-shell]="!api.email()">
+      @if (!ready()) { <div class="working"><ion-spinner /><p>Kapcsolódás…</p></div> }
+      @else {
+        @if (error()) { <div class="notice error" role="alert">{{ error() }} <ion-button size="small" fill="clear" (click)="initialize()">Újrapróbálom</ion-button></div> }
+        @if (!api.email()) { <app-auth (authenticated)="refresh()" /> }
+        @else {
+          @if (message()) { <p class="notice success" role="status">{{ message() }}</p> }
+          <section [hidden]="tab() !== 'overview'">
+            <div class="section-heading"><div><p class="eyebrow">TISZTÁBB KÉP A PÉNZEDRŐL</p><h1>Minden apró számít.</h1></div></div>
+            <p class="muted intro">Egy helyen a vásárlásaid, egészen a termékekig.</p>
+            <div class="month-picker"><label for="overview-month">Időszak</label><input id="overview-month" type="month" [value]="month()" (change)="changeMonth($any($event.target).value)"></div>
+            @if (loading()) { <div class="working" role="status"><ion-spinner /><span>Összesítés betöltése…</span></div> }
+            @if (summary(); as data) {
+              <article class="balance-card"><div class="balance-top"><span>{{ monthLabel() }}</span><span class="live-dot">Aktuális</span></div>
+                <p>Összes kiadásod</p><h2>{{ money(data.total) }}</h2>
+                <div class="balance-bottom"><span>{{ data.expenses.length }} vásárlás</span><span>Előző hónap: {{ money(data.previous) }}</span></div>
+              </article>
+              <div class="quick-stats"><div class="surface"><span>Vásárlásonként</span><strong>{{ money(data.expenses.length ? data.total / data.expenses.length : 0) }}</strong></div><div class="surface"><span>Kategóriák</span><strong>{{ data.categories.length }} <small>különböző</small></strong></div></div>
+              <ion-button expand="block" (click)="chooseTab('scan')"><ion-icon slot="start" name="camera-outline" /> Új blokk feltöltése</ion-button>
+              @if (data.budget != null) { <article class="surface budget-card"><div class="section-heading compact"><h3>Havi kereted</h3><strong>{{ money(data.budget) }}</strong></div><div class="progress-track"><span [style.width.%]="budgetProgress()"></span></div><p class="muted">Még {{ money(data.budget - data.total) }} maradt a keretből.</p></article> }
+              <article class="surface chart-card"><div class="section-heading compact"><h3>Így alakult a hónap</h3><span>napi költés</span></div>
+                <div class="day-chart" role="img" [attr.aria-label]="monthLabel() + ' napi kiadásai'">@for (day of data.days; track day.day) { <div class="day-column" [title]="day.day + '. nap: ' + money(day.amount)"><span [style.height.%]="day.amount * 100 / peak()" [class.has-spending]="day.amount > 0"></span></div> }</div><div class="chart-axis"><span>1.</span><span>A hónap napjai</span><span>{{ data.days.length }}.</span></div>
+              </article>
+              <div class="section-heading"><h2>Legutóbbi vásárlások</h2><ion-button fill="clear" size="small" (click)="chooseTab('expenses')">Összes</ion-button></div>
+              @for (expense of data.expenses.slice(0, 3); track expense.id) { <div class="expense-row surface"><div class="store-avatar">{{ expense.merchant.slice(0, 1) }}</div><div class="expense-label"><strong>{{ expense.merchant }}</strong><small>{{ expense.date }} · {{ expense.category }}</small></div><strong>{{ money(expense.amount) }}</strong></div> }
+              @if (!data.expenses.length) { <div class="empty-state surface"><ion-icon name="receipt-outline" /><h3>Itt kezdődik a történeted</h3><p>Fotózd le az első blokkod, és máris lesz mit követned.</p></div> }
+            }
+          </section>
+          <section [hidden]="tab() !== 'scan'"><app-scan (saved)="onSaved($event)" (busyChange)="busy.set($event)" /></section>
+          <section [hidden]="tab() !== 'expenses'">
+            <div class="section-heading"><div><p class="eyebrow">VISSZAKERESHETŐ VÁSÁRLÁSOK</p><h1>A kosarad története.</h1></div><ion-button fill="clear" aria-label="Kiadások frissítése" [disabled]="loading()" (click)="refresh()"><ion-icon name="refresh-outline" /></ion-button></div>
+            <div class="month-picker"><label for="expenses-month">Időszak</label><input id="expenses-month" type="month" [value]="month()" (change)="changeMonth($any($event.target).value)"></div>
+            <div class="search-modes" aria-label="Keresés típusa"><button [class.active]="searchMode() === 'merchant'" (click)="searchMode.set('merchant')">Bolt szerint</button><button [class.active]="searchMode() === 'product'" (click)="searchMode.set('product')">Termék szerint</button></div>
+            <ion-input type="search" fill="outline" [label]="searchMode() === 'product' ? 'Termék neve, pl. tej' : 'Bolt neve, pl. SPAR'" labelPlacement="stacked" [ngModel]="query()" (ngModelChange)="query.set($event ?? '')" />
+            @if (loading()) { <div class="working" role="status"><ion-spinner /><p>Kiadások betöltése…</p></div> }
+            @if (searchMode() === 'product') {
+              @if (query().trim()) {
+                <div class="product-summary"><span>A keresett termékekre költöttél</span><strong>{{ money(productTotal()) }}</strong><small>{{ productLines().length }} találat · {{ monthLabel() }}</small></div>
+                @for (line of productLines(); track $index) { <article class="surface product-result"><div><strong>{{ line.item.name }}</strong><small>{{ line.expense.merchant }} · {{ line.expense.date }}</small></div><strong>{{ money(line.item.amount) }}</strong></article> }
+                @if (!productLines().length) { <p class="empty-state">Ebben a hónapban nincs ilyen felismert termék.</p> }
+              } @else { <div class="empty-state"><ion-icon name="receipt-outline" /><p>Keress konkrét termékre, és összeadjuk, mennyit költöttél rá a kiválasztott hónapban.</p></div> }
+            } @else {
+              <p class="muted list-count">{{ shownExpenses().length }} vásárlás · {{ monthLabel() }}</p>
+              @for (expense of shownExpenses(); track expense.id) {
+                <article class="surface expense-detail"><button class="expense-row" [attr.aria-expanded]="expanded() === expense.id" (click)="expanded.set(expanded() === expense.id ? null : expense.id)"><div class="store-avatar">{{ expense.merchant.slice(0, 1) }}</div><div class="expense-label"><strong>{{ expense.merchant }}</strong><small>{{ expense.date }} · {{ expense.items.length }} tétel</small></div><strong>{{ money(expense.amount) }}</strong></button>
+                  @if (expanded() === expense.id) { <div class="saved-items">@for (item of expense.items; track $index) { <div><span>{{ item.name }}</span><strong [class.discount]="item.kind === 'discount'">{{ money(item.amount) }}</strong></div> } @if (!expense.items.length) { <p class="muted">Ehhez a kiadáshoz nincs terméksor.</p> }<small>{{ expense.category }} · {{ expense.paymentMethod ?? 'Fizetési mód nincs megadva' }}</small></div> }
+                </article>
+              }
+              @if (!shownExpenses().length && !loading()) { <div class="empty-state surface"><h3>Még nincs itt vásárlás.</h3><p>Válassz másik hónapot, vagy tölts fel egy blokkot.</p><ion-button fill="outline" (click)="chooseTab('scan')">Blokk feltöltése</ion-button></div> }
+            }
+          </section>
+        }
+      }
+    </main>
+  </ion-content>
+  @if (ready() && api.email()) {
+    <nav class="bottom-nav" aria-label="Főmenü">
+      <button [class.active]="tab() === 'overview'" [disabled]="busy()" [attr.aria-current]="tab() === 'overview' ? 'page' : null" (click)="chooseTab('overview')"><ion-icon name="home-outline" /><span>Áttekintés</span></button>
+      <button class="scan-tab" [class.active]="tab() === 'scan'" [disabled]="busy()" [attr.aria-current]="tab() === 'scan' ? 'page' : null" (click)="chooseTab('scan')"><span class="scan-tab-icon"><ion-icon name="camera-outline" /></span><span>Új blokk</span></button>
+      <button [class.active]="tab() === 'expenses'" [disabled]="busy()" [attr.aria-current]="tab() === 'expenses' ? 'page' : null" (click)="chooseTab('expenses')"><ion-icon name="receipt-outline" /><span>Kiadások</span></button>
+    </nav>
+  }
+</ion-app>
