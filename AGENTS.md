@@ -2,7 +2,7 @@
 
 ## Project Structure
 
-Számlázó is a Hungarian expense tracker built with ASP.NET Core 10, Angular 22, and SQLite. Angular source, templates, and styles live in `web/src/`.
+Számlázó is a Hungarian expense tracker built with ASP.NET Core 10, Angular 22, and SQLite. The web frontend lives in `web/src/`. The Ionic/Capacitor Android frontend lives in `mobile/src/`, with native configuration in `mobile/android/`. Keep mobile API/session, photo acquisition, and validation code in `mobile/src/app/core/`; keep screens in their feature folders. Follow `docs/mobile-roadmap.md` for later settings and file-retention work.
 
 ## Clean Architecture
 
@@ -19,6 +19,8 @@ Apply these boundaries to every backend change. Dependencies point inward toward
 - `npm.cmd --prefix web ci` installs dependencies from the lockfile. `npm.cmd --prefix web run build` compiles the frontend.
 - `docker compose up --build -d` starts the app at `http://localhost:8087` with OCR and PDF tools.
 - For live frontend development, start Docker and run `npm.cmd --prefix web start`. The Angular proxy targets the Docker API at port 8087.
+- `npm.cmd --prefix mobile ci`, `npm.cmd --prefix mobile run build`, and `npm.cmd --prefix mobile test` install, build, and test the mobile frontend. `npm.cmd --prefix mobile start` serves it at `http://localhost:8100` with an API proxy.
+- `npm.cmd --prefix mobile run android:sync` builds native assets and synchronizes Capacitor; `npm.cmd --prefix mobile run android:open` opens Android Studio. See `mobile/README.md` for API URLs, JDK/SDK setup, APK builds, and USB testing. Never commit generated native environment files, SDK paths, or signing keys.
 
 ## EF Core Migrations
 

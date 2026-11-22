@@ -2,6 +2,8 @@
 
 Magyar nyelvű, helyben futtatható háztartási kiadásnapló. A webes felület Angular 22, az API ASP.NET Core 10, az adattárolás SQLite. Az alkalmazás saját gépen, külső AI API és előfizetés nélkül használható.
 
+Az Androidhoz készülő külön [Ionic mobilalkalmazás](mobile/README.md) a `mobile/` könyvtárban található. Kamera- és galériás feltöltést, javítható importelőnézetet, havi áttekintést és termék szerinti keresést ad a meglévő backendhez. A beállítások és az opcionális eredetifájl-megőrzés külön [fejlesztési lépések](docs/mobile-roadmap.md).
+
 ## Indítás
 
 Docker Engine és Docker Compose szükséges. A projekt gyökérkönyvtárában futtasd:

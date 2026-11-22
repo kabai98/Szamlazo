@@ -12,3 +12,4 @@ test-images
 local-config
 .env
 **/__pycache__
+mobile

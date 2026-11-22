@@ -1,0 +1,8 @@
+{
+  "appId": "hu.kabai.szamlazo",
+  "appName": "Számlázó",
+  "webDir": "dist/mobile/browser",
+  "plugins": {
+    "CapacitorHttp": { "enabled": true }
+  }
+}

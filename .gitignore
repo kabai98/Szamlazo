@@ -14,3 +14,4 @@ test-images/
 local-config/
 .env
 **/__pycache__/
+mobile/src/environments/environment.native.ts

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Számlázó</string>
+    <string name="title_activity_main">Számlázó</string>
+    <string name="package_name">hu.kabai.szamlazo</string>
+    <string name="custom_url_scheme">hu.kabai.szamlazo</string>
+</resources>
